@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">System Alerts</h2>
+
+<div class="glass-card">
+    <table class="table table-dark table-hover">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Risk Level</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="alertsTableBody">
+            <tr>
+                <td colspan="6" class="text-center">Loading alerts...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Alert Details Modal -->
+<div class="modal fade" id="alertModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Alert Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Alert details will be inserted here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="approveBtn">
+                    <i class="fas fa-check me-1"></i>Approve
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentAlertId = null;
+    let currentUserRole = '{{ session.role }}';
+    let alertModal = null;
+
+    async function loadAlerts() {
+        try {
+            const response = await fetch('/api/get_alerts');
+            const alerts = await response.json();
+
+            const tbody = document.getElementById('alertsTableBody');
+
+            if (alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No alerts found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            alerts.forEach(alert => {
+                const row = document.createElement('tr');
+
+                // Get alert ID
+                const alertId = alert._id && alert._id.$oid ? alert._id.$oid : alert._id;
+
+                // Badge color based on type
+                let badgeClass = alert.type === 'Multiple Check-in' ? 'bg-warning' : 'bg-danger';
+
+                // Status badge
+                let statusBadge = '';
+                if (alert.status === 'pending') {
+                    statusBadge = '<span class="badge bg-secondary">Pending</span>';
+                } else if (alert.status === 'reviewed') {
+                    statusBadge = `<span class="badge bg-info">Reviewed by ${alert.reviewed_by}</span>`;
+                } else if (alert.status === 'approved') {
+                    statusBadge = `<span class="badge bg-success">Approved by ${alert.reviewed_by}</span>`;
+                }
+
+                // Action button
+                let actionBtn = '';
+                if (currentUserRole === 'Teacher' && alert.status === 'pending') {
+                    actionBtn = `<button class="btn btn-sm btn-outline-light review-btn" data-id="${alertId}" data-user="${alert.user}" data-type="${alert.type}" data-desc="${alert.description}">Review</button>`;
+                } else if (currentUserRole === 'Student') {
+                    actionBtn = '<span class="text-muted">View Only</span>';
+                } else {
+                    actionBtn = '<span class="text-success">Completed</span>';
+                }
+
+                row.innerHTML = `
+                    <td><span class="badge ${badgeClass}">${alert.type}</span></td>
+                    <td>${alert.description}</td>
+                    <td><span class="text-${alert.risk_level === 'High' ? 'danger' : 'warning'}">${alert.risk_level}</span></td>
+                    <td>${alert.time}</td>
+                    <td>${statusBadge}</td>
+                    <td>${actionBtn}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+
+            // Add event listeners to all review buttons
+            document.querySelectorAll('.review-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const id = this.getAttribute('data-id');
+                    const user = this.getAttribute('data-user');
+                    const type = this.getAttribute('data-type');
+                    const desc = this.getAttribute('data-desc');
+                    reviewAlert(id, user, type, desc);
+                });
+            });
+
+        } catch (e) {
+            console.error('Error loading alerts:', e);
+        }
+    }
+
+    function reviewAlert(alertId, user, type, description) {
+        currentAlertId = alertId;
+        document.getElementById('modalTitle').innerText = 'Review Alert - ' + type;
+        document.getElementById('modalBody').innerHTML = `
+            <p><strong>User:</strong> ${user}</p>
+            <p><strong>Alert Type:</strong> ${type}</p>
+            <p><strong>Description:</strong> ${description}</p>
+            <p><strong>Status:</strong> Pending Review</p>
+            <hr>
+            <p class="text-warning"><i class="fas fa-exclamation-triangle me-2"></i>Please review this alert and approve if legitimate.</p>
+        `;
+
+        if (!alertModal) {
+            alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
+        }
+        alertModal.show();
+    }
+
+    // Approve button click handler
+    document.getElementById('approveBtn').addEventListener('click', async function () {
+        if (!currentAlertId) return;
+
+        try {
+            const response = await fetch('/api/approve_alert', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    alert_id: currentAlertId,
+                    action: 'approved'
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert(data.message);
+                if (alertModal) {
+                    alertModal.hide();
+                }
+                loadAlerts(); // Reload alerts
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        } catch (e) {
+            alert('Network error: ' + e.message);
+        }
+    });
+
+    // Load alerts on page load
+    loadAlerts();
+
+    // Refresh every 10 seconds
+    setInterval(loadAlerts, 10000);
+</script>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="glass-card">
+            <h2 class="mb-4" data-i18n="reg_title">Register New User</h2>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="video-container">
+                        <video id="video" width="100%" autoplay playsinline></video>
+                        <canvas id="canvas" style="display:none;"></canvas>
+                        <img id="capturedImage" style="display:none; width: 100%;">
+                    </div>
+                    <div class="mt-3 text-center">
+                        <button type="button" class="btn btn-outline-light" id="captureBtn" data-i18n="btn_capture">
+                            <i class="fas fa-camera me-2"></i> Capture Face
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" id="retakeBtn" style="display:none;"
+                            data-i18n="btn_retake">
+                            <i class="fas fa-redo me-2"></i> Retake
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <form id="registrationForm">
+                        <div class="mb-3">
+                            <label for="name" class="form-label" data-i18n="reg_name">Full Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="role" class="form-label" data-i18n="reg_role">Role</label>
+                            <select class="form-select" id="role" name="role" onchange="toggleAccountFields()">
+                                <option value="Student">Student</option>
+                                <option value="Teacher">Teacher</option>
+                                <option value="Staff">Staff</option>
+                                <option value="Visitor">Visitor</option>
+                            </select>
+                        </div>
+
+                        <div id="accountFields">
+                            <div class="mb-3">
+                                <label for="username" class="form-label" data-i18n="reg_username">Username</label>
+                                <input type="text" class="form-control" id="username" name="username">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="password" class="form-label" data-i18n="reg_password">Password</label>
+                                <input type="password" class="form-control" id="password" name="password">
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn"
+                                data-i18n="btn_register">
+                                Register User
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="message" class="mt-3 alert" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const capturedImage = document.getElementById('capturedImage');
+    const captureBtn = document.getElementById('captureBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const form = document.getElementById('registrationForm');
+    const messageDiv = document.getElementById('message');
+    const submitBtn = document.getElementById('submitBtn');
+
+    let imageBlob = null;
+
+    function toggleAccountFields() {
+        const role = document.getElementById('role').value;
+        const accountFields = document.getElementById('accountFields');
+        if (role === 'Student' || role === 'Teacher') {
+            accountFields.style.display = 'block';
+        } else {
+            accountFields.style.display = 'none';
+        }
+    }
+
+    // Run on load
+    toggleAccountFields();
+
+    // Initialize Camera
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' }
+            });
+            video.srcObject = stream;
+        } catch (err) {
+            showMessage('danger', 'Camera access denied: ' + err.message);
+        }
+    }
+
+    function showMessage(type, text) {
+        messageDiv.className = `mt-3 alert alert-${type}`;
+        messageDiv.innerText = text;
+        messageDiv.style.display = 'block';
+    }
+
+    captureBtn.addEventListener('click', () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+
+        canvas.toBlob((blob) => {
+            imageBlob = blob;
+            capturedImage.src = URL.createObjectURL(blob);
+            capturedImage.style.display = 'block';
+            video.style.display = 'none';
+            captureBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+        }, 'image/jpeg');
+    });
+
+    retakeBtn.addEventListener('click', () => {
+        imageBlob = null;
+        capturedImage.style.display = 'none';
+        video.style.display = 'block';
+        captureBtn.style.display = 'inline-block';
+        retakeBtn.style.display = 'none';
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!imageBlob) {
+            showMessage('warning', 'Please capture a face first');
+            return;
+        }
+
+        const name = document.getElementById('name').value;
+        const role = document.getElementById('role').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        if (!name) {
+            showMessage('warning', 'Please enter a name');
+            return;
+        }
+
+        if ((role === 'Student' || role === 'Teacher') && (!username || !password)) {
+            showMessage('warning', 'Please enter username and password for this role');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', imageBlob, 'register.jpg');
+        formData.append('name', name);
+        formData.append('role', role);
+        formData.append('username', username);
+        formData.append('password', password);
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Registering...';
+
+        try {
+            const response = await fetch('/submit_registration', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                showMessage('success', data.message);
+                form.reset();
+                retakeBtn.click();
+                toggleAccountFields();
+            } else {
+                showMessage('danger', data.message);
+            }
+        } catch (err) {
+            showMessage('danger', 'Network Error: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Register User';
+        }
+    });
+
+    initCamera();
+</script>
+{% endblock %}

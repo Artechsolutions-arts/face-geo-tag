@@ -1,0 +1,41 @@
+import pandas as pd
+import numpy as np
+import redis
+
+# Connect to Redis Client
+hostname = 'redis-13246.c267.us-east-1-4.ec2.cloud.redislabs.com'
+portnumber = 13246
+password = 'aRkbqXJx1Dea2K6TbebfBUeJJrDJ6TZJ'
+
+r = redis.StrictRedis(host=hostname,
+                    port=portnumber,
+                    password=password)
+r.ping()
+
+# Get user input for the person to delete
+name_to_delete = input("Enter the name of the person you want to delete: ")
+role = input("Enter role of the person you want to delete: ")
+
+# Form the key in your Redis hash
+name = 'academy:register'
+key_to_del = f'{name_to_delete}@{role}'
+
+# Check if the key exists before attempting to delete
+if r.hexists(name, key_to_del):
+    # Delete the key/field
+    r.hdel(name, key_to_del)
+    print(f"{name_to_delete} has been deleted from the database.")
+else:
+    print(f"{name_to_delete} not found in the database.")
+
+Harsh V.  not found in the database.
+
+key_to_del = 'NayanVR'
+r.hdel(name, key_to_del)
+
+0
+
+ 
+
+ 
+

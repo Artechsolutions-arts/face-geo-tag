@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4" data-i18n="nav_dashboard">Real-Time Dashboard</h2>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="glass-card stat-card">
+            <h5 data-i18n="dash_total_students">Total Students</h5>
+            <div class="stat-value" id="totalStudents">--</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card stat-card">
+            <h5 data-i18n="dash_present_today">Present Today</h5>
+            <div class="stat-value text-success" id="presentToday">--</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card stat-card">
+            <h5 data-i18n="dash_anomalies">Anomalies</h5>
+            <div class="stat-value text-danger" id="anomalies">--</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="glass-card">
+            <h4 class="mb-3" data-i18n="dash_trends">Attendance Trends</h4>
+            <canvas id="attendanceChart"></canvas>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card">
+            <h4 class="mb-3" data-i18n="dash_quick_actions">Quick Actions</h4>
+            <button class="btn btn-outline-light w-100 mb-3" onclick="downloadReport()" data-i18n="btn_download_report">
+                <i class="fas fa-download me-2"></i>Download Report
+            </button>
+            <button class="btn btn-outline-light w-100 mb-3" onclick="window.location.href='/register'"
+                data-i18n="btn_manage_students">
+                <i class="fas fa-users me-2"></i>Manage Students
+            </button>
+            <button class="btn btn-outline-primary w-100 mb-3" onclick="syncPortal()" data-i18n="btn_sync_portal">
+                <i class="fas fa-sync me-2"></i>Sync with ITI Portal
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Download Report Function
+    async function downloadReport() {
+        try {
+            const response = await fetch('/api/download_report');
+            if (!response.ok) {
+                throw new Error('Failed to download report');
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'attendance_report_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            alert('Error downloading report: ' + e.message);
+        }
+    }
+
+    // Sync with Portal Function
+    async function syncPortal() {
+        const btn = event.currentTarget;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Syncing...';
+
+        try {
+            const response = await fetch('/api/sync_portal', { method: 'POST' });
+            const data = await response.json();
+            alert(data.message);
+        } catch (e) {
+            alert('Sync failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    // Fetch stats
+    async function updateStats() {
+        try {
+            const response = await fetch('/api/stats');
+            const data = await response.json();
+
+            document.getElementById('totalStudents').innerText = data.total_students;
+            document.getElementById('presentToday').innerText = data.present_today;
+            document.getElementById('anomalies').innerText = data.anomalies;
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    updateStats();
+    setInterval(updateStats, 5000); // Update every 5s
+
+    // Chart.js
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+            datasets: [{
+                label: 'Attendance',
+                data: [12, 19, 3, 5, 2, 3], // Mock data for POC
+                borderColor: '#6c5ce7',
+                tension: 0.4,
+                fill: true,
+                backgroundColor: 'rgba(108, 92, 231, 0.2)'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: { color: 'white' }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: { color: 'white' },
+                    grid: { color: 'rgba(255,255,255,0.1)' }
+                },
+                x: {
+                    ticks: { color: 'white' },
+                    grid: { color: 'rgba(255,255,255,0.1)' }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

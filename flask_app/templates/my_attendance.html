@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">My Attendance History</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="glass-card">
+            <h4 class="mb-3">Attendance Records</h4>
+            <table class="table table-dark table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="attendanceTableBody">
+                    <tr>
+                        <td colspan="4" class="text-center">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="glass-card mb-4">
+            <h4 class="mb-3"><i class="fas fa-chart-pie me-2"></i>Statistics</h4>
+            <div class="mb-3">
+                <strong>Total Days:</strong> <span id="totalDays">--</span>
+            </div>
+            <div class="mb-3">
+                <strong>Present:</strong> <span id="presentDays" class="text-success">--</span>
+            </div>
+            <div class="mb-3">
+                <strong>Attendance %:</strong> <span id="attendancePercent" class="text-info">--</span>
+            </div>
+            <div class="progress" style="height: 25px;">
+                <div id="progressBar" class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h4 class="mb-3"><i class="fas fa-calendar me-2"></i>This Month</h4>
+            <div id="monthSummary">
+                <p class="text-white-50">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const username = '{{ session.username }}';
+
+    async function loadMyAttendance() {
+        try {
+            const response = await fetch(`/api/my_attendance?username=${username}`);
+            const data = await response.json();
+
+            const tbody = document.getElementById('attendanceTableBody');
+
+            if (data.records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No attendance records found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+
+            data.records.forEach(record => {
+                const row = document.createElement('tr');
+                const dateTime = new Date(record.timestamp);
+                const date = dateTime.toLocaleDateString();
+                const time = dateTime.toLocaleTimeString();
+
+                row.innerHTML = `
+                    <td>${date}</td>
+                    <td>${time}</td>
+                    <td>${record.lat.toFixed(4)}, ${record.long.toFixed(4)}</td>
+                    <td><span class="badge bg-success">Present</span></td>
+                `;
+
+                tbody.appendChild(row);
+            });
+
+            // Update statistics
+            document.getElementById('totalDays').innerText = data.stats.total_days;
+            document.getElementById('presentDays').innerText = data.stats.present_days;
+            document.getElementById('attendancePercent').innerText = data.stats.percentage + '%';
+
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = data.stats.percentage + '%';
+            progressBar.innerText = data.stats.percentage + '%';
+
+            // Month summary
+            document.getElementById('monthSummary').innerHTML = `
+                <p><strong>Days Present:</strong> ${data.stats.this_month}</p>
+                <p class="text-white-50">Keep up the good work!</p>
+            `;
+
+        } catch (e) {
+            console.error('Error loading attendance:', e);
+            document.getElementById('attendanceTableBody').innerHTML =
+                '<tr><td colspan="4" class="text-center text-danger">Error loading data</td></tr>';
+        }
+    }
+
+    loadMyAttendance();
+</script>
+{% endblock %}

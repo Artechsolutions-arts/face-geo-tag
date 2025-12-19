@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-md-8 text-center">
+        <div class="glass-card p-5">
+            <h1 class="display-4 mb-4" data-i18n="home_title">AI-Powered In-Plant Training Attendance</h1>
+            <p class="lead mb-5" data-i18n="home_subtitle">Secure, Geo-tagged, and Real-time attendance tracking for
+                Industry 4.0</p>
+
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-5">
+                    <a href="/attendance" class="btn btn-primary btn-lg w-100 py-3" data-i18n="btn_start_attendance">
+                        <i class="fas fa-camera me-2"></i> Start Attendance
+                    </a>
+                </div>
+                <div class="col-md-5">
+                    {% if session.role == 'Teacher' %}
+                    <a href="/dashboard" class="btn btn-outline-light btn-lg w-100 py-3" data-i18n="btn_view_dashboard">
+                        <i class="fas fa-chart-bar me-2"></i> View Dashboard
+                    </a>
+                    {% else %}
+                    <a href="/my_attendance" class="btn btn-outline-light btn-lg w-100 py-3"
+                        data-i18n="btn_my_attendance">
+                        <i class="fas fa-history me-2"></i> My Attendance
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
